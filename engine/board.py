@@ -1,29 +1,41 @@
+import torch
 import chess
 
-class ChessBoard:
-    def __init__(self, fen=chess.STARTING_FEN):
-        self.board = chess.Board(fen)
+def encode_board(board=None):
+    """
+    Encode a chess.Board() into a (17, 8, 8) tensor representation.
+    If no board is given, start from initial position.
+    """
+    if board is None:
+        board = chess.Board()
 
-    def get_fen(self):
-        #gives current fen
-        return self.board.fen()
+    planes = torch.zeros((17, 8, 8), dtype=torch.float32)
 
-    def legal_moves(self):
-        #returns all legal moves
-        return [move.uci() for move in self.board.legal_moves]
+    piece_map = {
+        chess.PAWN: 0,
+        chess.KNIGHT: 1,
+        chess.BISHOP: 2,
+        chess.ROOK: 3,
+        chess.QUEEN: 4,
+        chess.KING: 5,
+    }
 
-    def push_move(self, move_uci):
-        #Make the legal move on board
-        move = chess.Move.from_uci(move_uci)
-        if move in self.board.legal_moves:
-            self.board.push(move)
+    # Encode piece positions (6 planes for white, 6 for black)
+    for square, piece in board.piece_map().items():
+        row, col = divmod(square, 8)
+        plane_index = piece_map[piece.piece_type]
+        if piece.color == chess.WHITE:
+            planes[plane_index, row, col] = 1
         else:
-            raise ValueError(f"Illegal move: {move_uci}")
+            planes[6 + plane_index, row, col] = 1
 
-    def is_game_over(self):
-        #checks if checkmate or not
-        return self.board.is_game_over()
+    # Side to move
+    planes[12, :, :] = int(board.turn)
 
-    def result(self):
-        #returns result like0-1, 1-0 , 1/2 - 1/2, etc.
-        return self.board.result()
+    # Castling rights
+    planes[13, :, :] = int(board.has_kingside_castling_rights(chess.WHITE))
+    planes[14, :, :] = int(board.has_queenside_castling_rights(chess.WHITE))
+    planes[15, :, :] = int(board.has_kingside_castling_rights(chess.BLACK))
+    planes[16, :, :] = int(board.has_queenside_castling_rights(chess.BLACK))
+
+    return planes
