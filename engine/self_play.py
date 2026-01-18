@@ -75,6 +75,9 @@ def self_play_game(
             resign_count += 1
         else:
             resign_count = 0
+        
+        if board.can_claim_threefold_repetition():
+            return samples, "1/2-1/2"
 
         if resign_count >= resign_patience:
             # side to move resigns => opponent wins

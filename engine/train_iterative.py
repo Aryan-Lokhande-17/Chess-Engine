@@ -80,19 +80,18 @@ def main():
 
     # ✅ Iteration settings (stronger)
     iterations = 10
-    games_per_iter = 12
-    sims = 500
+    games_per_iter = 24
+    sims = 1000
 
     # ✅ Self-play behaviour (stronger + decisive)
-    max_moves = 180
-    temperature_moves = 8
-    resign_threshold = -0.85
+    max_moves = 160
+    temperature_moves = 10
+    resign_threshold = -0.80
     resign_patience = 6
 
-    # ✅ Training behaviour
-    epochs = 6
-    batch_size = 96
-    lr = 5e-4
+    epochs = 10
+    batch_size = 128
+    lr = 3e-4
 
     print(f"\n🔥 Training on device: {device}")
     print(f"Net: blocks=8 | channels=256 | policy={POLICY_SIZE}\n")
