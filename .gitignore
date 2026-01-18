@@ -1,7 +1,18 @@
+# venv
 venv/
+.venv/
+
+# python cache
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
+
+# training artifacts (DO NOT PUSH)
+data/selfplay/
+data/checkpoints/
+*.pt
+*.pth
+*.onnx
+
+# editor
 .vscode/
-.venv
+.idea/
