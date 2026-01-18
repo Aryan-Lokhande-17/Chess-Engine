@@ -1,0 +1,43 @@
+# engine/evaluate_elo.py
+import chess
+import random
+import torch
+from model import AlphaZeroNet
+from mcts import MCTS
+
+def play_game_engine_vs_random(model, sims=100, max_moves=200, device="cpu"):
+    board = chess.Board()
+    mcts = MCTS(model, simulations=sims, device=device)
+
+    while not board.is_game_over() and board.fullmove_number < max_moves:
+        if board.turn == chess.WHITE:
+            move, _ = mcts.run(board)
+            board.push(move)
+        else:
+            move = random.choice(list(board.legal_moves))
+            board.push(move)
+
+    return board.result()
+
+def main():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = AlphaZeroNet().to(device)
+
+    # model.load_state_dict(torch.load("data/checkpoints/latest.pt", map_location=device))
+
+    wins = draws = losses = 0
+    games = 50
+    for _ in range(games):
+        res = play_game_engine_vs_random(model, sims=100, device=device)
+        if res == "1-0":
+            wins += 1
+        elif res == "0-1":
+            losses += 1
+        else:
+            draws += 1
+
+    print(f"Results vs random in {games} games:")
+    print("Wins:", wins, "Draws:", draws, "Losses:", losses)
+
+if __name__ == "__main__":
+    main()

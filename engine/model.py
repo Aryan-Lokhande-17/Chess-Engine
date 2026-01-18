@@ -35,7 +35,7 @@ class AlphaZeroNet(nn.Module):
         channels: number of filters in the trunk conv layers (e.g., 128 or 256)
         policy_size: output size of policy vector (e.g., 4672)
     """
-    def __init__(self, in_channels=17, num_res_blocks=6, channels=128, policy_size=4672):
+    def __init__(self, in_channels=17, num_res_blocks=6, channels=128, policy_size=4096):
         super().__init__()
 
         # Initial conv layer to expand channels

@@ -1,65 +1,68 @@
+# engine/train.py
 import torch
 import torch.nn as nn
 import torch.optim as optim
+
 from model import AlphaZeroNet
-from board import encode_board  
-import random
+from self_play import self_play_game
+from move_encoding import POLICY_SIZE
 
-# Simulated dataset (you’ll later replace with self-play or PGN data)
-def generate_fake_data(batch_size=32):
-    boards = []
-    policy_targets = []
-    value_targets = []
+def train_one_iteration(model, device="cpu", games=5, sims=100, epochs=2, batch_size=32):
+    # 1) Generate data from self-play
+    replay = []
+    for g in range(games):
+        data, res = self_play_game(model, device=device, sims=sims)
+        replay.extend(data)
+        print(f"Self-play game {g+1}/{games} done -> {res}, samples: {len(data)}")
 
-    for _ in range(batch_size):
-        board_tensor = encode_board()  # [17, 8, 8]
-        boards.append(board_tensor)
-        
-        # Random move distribution (4672 possible moves)
-        policy_target = torch.rand(4672)
-        policy_target = policy_target / policy_target.sum()
-        policy_targets.append(policy_target)
+    # 2) Train on replay buffer
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    value_loss_fn = nn.MSELoss()
 
-        # Random game result (between -1 loss, 0 draw, +1 win)
-        value_target = torch.tensor([random.uniform(-1, 1)])
-        value_targets.append(value_target)
+    for ep in range(epochs):
+        model.train()
+        total_policy_loss = 0.0
+        total_value_loss = 0.0
 
-    return (
-        torch.stack(boards),
-        torch.stack(policy_targets),
-        torch.stack(value_targets),
-    )
+        # shuffle
+        perm = torch.randperm(len(replay))
 
-# Initialize model
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = AlphaZeroNet().to(device)
+        for i in range(0, len(replay), batch_size):
+            idx = perm[i:i+batch_size]
+            batch = [replay[j] for j in idx]
 
-# Losses
-policy_loss_fn = nn.CrossEntropyLoss()
-value_loss_fn = nn.MSELoss()
+            states = torch.stack([b[0] for b in batch]).to(device)         # (B,17,8,8)
+            target_pi = torch.stack([b[1] for b in batch]).to(device)      # (B,4096)
+            target_v = torch.stack([b[2] for b in batch]).to(device)       # (B,1)
 
-# Optimizer
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+            optimizer.zero_grad()
+            policy_logits, pred_v = model(states)
 
-# Training loop
-for epoch in range(5):  # For demo
-    model.train()
-    boards, policy_targets, value_targets = generate_fake_data(batch_size=8)
-    boards, policy_targets, value_targets = (
-        boards.to(device),
-        policy_targets.to(device),
-        value_targets.to(device),
-    )
+            # ✅ policy loss (distribution cross entropy)
+            policy_loss = -torch.mean(torch.sum(target_pi * torch.log_softmax(policy_logits, dim=1), dim=1))
 
-    optimizer.zero_grad()
-    policy_logits, values = model(boards)
+            # ✅ value loss
+            value_loss = value_loss_fn(pred_v, target_v)
 
-    # Cross-entropy expects class indices → use log_softmax to convert logits
-    policy_loss = -torch.mean(torch.sum(policy_targets * torch.log_softmax(policy_logits, dim=1), dim=1))
-    value_loss = value_loss_fn(values.squeeze(), value_targets.squeeze())
+            loss = policy_loss + value_loss
+            loss.backward()
+            optimizer.step()
 
-    total_loss = policy_loss + value_loss
-    total_loss.backward()
-    optimizer.step()
+            total_policy_loss += policy_loss.item()
+            total_value_loss += value_loss.item()
 
-    print(f"Epoch {epoch+1}/5 | Policy Loss: {policy_loss.item():.4f} | Value Loss: {value_loss.item():.4f}")
+        print(f"Epoch {ep+1}/{epochs} | PolicyLoss: {total_policy_loss:.4f} | ValueLoss: {total_value_loss:.4f}")
+
+def main():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = AlphaZeroNet(in_channels=17, num_res_blocks=4, channels=128, policy_size=POLICY_SIZE).to(device)
+
+    print("Training on device:", device)
+    train_one_iteration(model, device=device, games=3, sims=80, epochs=2)
+
+    # Save checkpoint
+    torch.save(model.state_dict(), "data/checkpoints/latest.pt")
+    print("✅ Saved model to data/checkpoints/latest.pt")
+
+if __name__ == "__main__":
+    main()
