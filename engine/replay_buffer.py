@@ -29,6 +29,6 @@ class ReplayBuffer:
 
     def load(self, path):
         if os.path.exists(path):
-            self.data = torch.load(path)
+            self.data = torch.load(path, map_location="cpu", weights_only=False)
         else:
             self.data = []
