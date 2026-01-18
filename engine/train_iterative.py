@@ -67,7 +67,7 @@ def main():
     ckpt_path = "data/checkpoints/latest.pt"
     if os.path.exists(ckpt_path):
         try:
-            model.load_state_dict(torch.load(ckpt_path, map_location=device))
+            model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True))
             print("✅ Loaded checkpoint:", ckpt_path)
         except Exception:
             print("⚠️ Checkpoint mismatch. Delete latest.pt and replay.pt then re-run.")
